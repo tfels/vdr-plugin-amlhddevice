@@ -1,0 +1,13 @@
+This is a "plugin" for the Video Disk Recorder (VDR).
+
+Written by:                  Thomas Reufer <thomas@reufer.ch>
+
+Project's homepage:          http://projects.vdr-developer.org/projects/plg-amlhddevice
+
+Latest version available at: git://projects.vdr-developer.org/vdr-plugin-amlhddevice.git
+
+See the file COPYING for license information.
+
+Description:
+
+  VDR HD output device for Amlogic SoC.

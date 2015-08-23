@@ -1,0 +1,13 @@
+VDR Plugin 'amlhddevice' Revision History
+-----------------------------------------
+
+2015-08-23: Version 0.0.1
+-------------------------
+initial prototype
+- tested:
+  - live TV
+  - frame buffer OSD
+- missing:
+  - A/V sync
+  - replay mode
+  - much more...
