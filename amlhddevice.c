@@ -63,14 +63,6 @@ bool cPluginAmlHdDevice::Initialize(void)
 		cSysFs::Write("/sys/class/graphics/fb0/blank", 1);
 		cSysFs::Write("/sys/class/graphics/fb1/mode", "U:1280x720p-0\n");
 		cSysFs::Write("/sys/class/graphics/fb1/blank", 0);
-
-		// 0: vmaster
-		// 1: amaster
-		// 2: pcrmaster
-		cSysFs::Write("/sys/class/tsync/mode", 1);
-
-		cSysFs::Write("/sys/class/tsync/enable", 1);
-		cSysFs::Write("/sys/class/tsync/pts_pcrscr", "0x0");
 	}
 	return true;
 }

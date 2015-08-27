@@ -10,7 +10,7 @@ extern "C" {
 #include <codec.h>
 }
 
-#include <vdr/libsi/si.h>
+#include <libsi/si.h>
 
 #include "tools.h"
 #include "amldevice.h"
@@ -26,7 +26,7 @@ public:
 	cAmlDecoder() :
 		m_initialized(false)
 	{
-		memset(&m_param, 0, sizeof(codec_para_t));
+		Reset();
 	}
 
 	virtual ~cAmlDecoder()
@@ -35,7 +35,7 @@ public:
 			codec_close(&m_param);
 	}
 
-	virtual void Reset(void)
+	virtual void Stop(void)
 	{
 		if (m_initialized)
 			codec_close(&m_param);
@@ -43,15 +43,19 @@ public:
 		m_initialized = false;
 	}
 
-	virtual int Write(const uchar *data, int length, int64_t pts = INVALID_PTS)
+	virtual void Reset(void)
+	{
+		Stop();
+		memset(&m_param, 0, sizeof(codec_para_t));
+		m_param.stream_type = STREAM_TYPE_TS;
+	}
+
+	virtual int WriteTs(const uchar *data, int length)
 	{
 		if (!m_initialized)
 			return 0;
 
 		int ret = length;
-
-		if (pts != INVALID_PTS)
-			codec_checkin_pts(&m_param, pts);
 
 		while (length)
 		{
@@ -76,6 +80,53 @@ public:
 		return m_initialized;
 	}
 
+	void SetAudioPid(int pid, int streamType)
+	{
+		if (!m_param.has_audio)
+			Stop();
+
+		m_param.has_audio = 1;
+		m_param.audio_pid = pid;
+		m_param.audio_type =
+				streamType == 0x03 ? AFORMAT_MPEG :
+				streamType == 0x04 ? AFORMAT_MPEG :
+				streamType == SI::AC3DescriptorTag ? AFORMAT_AC3 :
+				streamType == SI::EnhancedAC3DescriptorTag ? AFORMAT_EAC3 :
+				streamType == 0x0f ? AFORMAT_AAC :
+				streamType == 0x11 ? AFORMAT_AAC : AFORMAT_UNKNOWN;
+
+		m_param.audio_channels = 0;
+		m_param.audio_samplerate = 0;
+		m_param.audio_info.channels = 0;
+		m_param.audio_info.sample_rate = 0;
+
+		if (!ApplyConfig())
+			ELOG("failed to set audio codec!");
+		else
+			DLOG("set audio codec");
+	}
+
+	void SetVideoPid(int pid, int streamType)
+	{
+		if (!m_param.has_video)
+			Stop();
+
+		m_param.has_video = 1;
+		m_param.video_pid = pid;
+		m_param.video_type =
+				streamType == 0x01 ? VFORMAT_MPEG12 :
+				streamType == 0x02 ? VFORMAT_MPEG12 :
+				streamType == 0x1b ? VFORMAT_H264   : VFORMAT_UNKNOWN;
+
+		m_param.am_sysinfo.format = m_param.video_type == VFORMAT_H264 ?
+				VIDEO_DEC_FORMAT_H264 : VIDEO_DEC_FORMAT_UNKNOW;
+
+		if (!ApplyConfig())
+			ELOG("failed to set video codec!");
+		else
+			DLOG("set video codec");
+	}
+
 protected:
 
 	bool ApplyConfig(void)
@@ -91,120 +142,10 @@ protected:
 
 /* ------------------------------------------------------------------------- */
 
-class cAmlAudioDecoder : public cAmlDecoder
-{
-public:
-
-	enum eAudioCodec {
-		eUnknown = 0,
-		eMPEG,
-		eAAC,
-		eAC3,
-		eEAC3,
-		eDTS
-	};
-
-	static const char* Str(eAudioCodec codec) {
-		return	codec == eMPEG ? "MPEG" :
-				codec == eAAC  ? "AAC"  :
-				codec == eAC3  ? "AC3"  :
-				codec == eEAC3 ? "EAC3" :
-				codec == eDTS  ? "DTS"  : "unknown";
-	}
-
-	cAmlAudioDecoder() :
-		cAmlDecoder()
-	{
-		codec_audio_basic_init();
-	}
-
-	void SetCodec(eAudioCodec codec)
-	{
-		m_param.has_audio = 1;
-		m_param.stream_type = STREAM_TYPE_ES_AUDIO;
-		m_param.audio_type =
-				codec == eMPEG ? AFORMAT_MPEG :
-				codec == eAAC  ? AFORMAT_AAC  :
-				codec == eAC3  ? AFORMAT_AC3  :
-				codec == eEAC3 ? AFORMAT_EAC3 :
-				codec == eDTS  ? AFORMAT_DTS  : 0;
-
-		m_param.audio_channels = 0;
-		m_param.audio_samplerate = 0;
-		m_param.audio_info.channels = 0;
-		m_param.audio_info.sample_rate = 0;
-
-		if (!ApplyConfig())
-			ELOG("failed to set audio codec to %s!", Str(codec));
-		else
-			DLOG("set audio codec to %s", Str(codec));
-	}
-
-	static eAudioCodec MapStreamTypes(int type)
-	{
-		return	type == 0x03 ? eMPEG :
-				type == 0x04 ? eMPEG :
-				type == SI::AC3DescriptorTag ? eAC3 :
-				type == SI::EnhancedAC3DescriptorTag ? eEAC3 :
-				type == 0x0f ? eAAC :
-				type == 0x11 ? eAAC : eUnknown;
-	}
-};
-
-/* ------------------------------------------------------------------------- */
-
-class cAmlVideoDecoder : public cAmlDecoder
-{
-
-#define EXTERNAL_PTS (1)
-#define SYNC_OUTSIDE (2)
-
-public:
-
-	enum eVideoCodec {
-		eUnknown = 0,
-		eMPEG12,
-		eH264
-	};
-
-	static const char* Str(eVideoCodec codec) {
-		return	codec == eMPEG12 ? "MPEG1/2" :
-				codec == eH264   ? "H264"    : "unknown";
-	}
-
-	void SetCodec(eVideoCodec codec)
-	{
-		m_param.has_video = 1;
-		m_param.stream_type = STREAM_TYPE_ES_VIDEO;
-		m_param.video_type =
-				codec == eMPEG12 ? VFORMAT_MPEG12 :
-				codec == eH264   ? VFORMAT_H264   : 0;
-
-		m_param.am_sysinfo.format = VIDEO_DEC_FORMAT_UNKNOW;
-		m_param.am_sysinfo.param = (void *)(EXTERNAL_PTS | SYNC_OUTSIDE);
-		m_param.am_sysinfo.rate = 0;
-
-		if (!ApplyConfig())
-			ELOG("failed to set video codec to %s!", Str(codec));
-		else
-			DLOG("set video codec to %s", Str(codec));
-	}
-
-	static eVideoCodec MapStreamTypes(int type)
-	{
-		return type == 0x01 ? eMPEG12 :
-				type == 0x02 ? eMPEG12 :
-				type == 0x1b ? eH264 : eUnknown;
-	}
-};
-
-/* ------------------------------------------------------------------------- */
-
 cAmlDevice::cAmlDevice(void (*onPrimaryDevice)(void)) :
 	cDevice(),
 	m_onPrimaryDevice(onPrimaryDevice),
-	m_audioDecoder(new cAmlAudioDecoder()),
-	m_videoDecoder(new cAmlVideoDecoder()),
+	m_decoder(new cAmlDecoder()),
 	m_audioPid(0),
 	m_videoPid(0)
 {
@@ -214,8 +155,7 @@ cAmlDevice::~cAmlDevice()
 {
 	DeInit();
 
-	delete m_videoDecoder;
-	delete m_audioDecoder;
+	delete m_decoder;
 }
 
 int cAmlDevice::Init(void)
@@ -243,6 +183,9 @@ void cAmlDevice::MakePrimaryDevice(bool On)
 	if (On && m_onPrimaryDevice)
 		m_onPrimaryDevice();
 	cDevice::MakePrimaryDevice(On);
+
+	cSysFs::Write("/sys/class/tsync/enable", 1);
+	codec_audio_basic_init();
 }
 
 void cAmlDevice::GetOsdSize(int &Width, int &Height, double &PixelAspect)
@@ -264,8 +207,8 @@ bool cAmlDevice::SetPlayMode(ePlayMode PlayMode)
 	switch (PlayMode)
 	{
 	case pmNone:
-		m_audioDecoder->Reset();
-		m_videoDecoder->Reset();
+		m_decoder->Reset();
+//		cSysFs::Write("/sys/class/tsync/pts_pcrscr", "0x0");
 		m_audioPid = 0;
 		m_videoPid = 0;
 		break;
@@ -283,22 +226,6 @@ bool cAmlDevice::SetPlayMode(ePlayMode PlayMode)
 	return true;
 }
 
-int cAmlDevice::PlayVideo(const uchar *Data, int Length)
-{
-	return m_videoDecoder->Write(
-			Data + PesPayloadOffset(Data),
-			Length - PesPayloadOffset(Data),
-			PesHasPts(Data) ? PesGetPts(Data) : INVALID_PTS);
-}
-
-int cAmlDevice::PlayAudio(const uchar *Data, int Length, uchar Id)
-{
-	return m_audioDecoder->Write(
-			Data + PesPayloadOffset(Data),
-			Length - PesPayloadOffset(Data),
-			PesHasPts(Data) ? PesGetPts(Data) : INVALID_PTS);
-}
-
 int cAmlDevice::PlayTsVideo(const uchar *Data, int Length)
 {
 	int pid = TsPid(Data);
@@ -307,12 +234,11 @@ int cAmlDevice::PlayTsVideo(const uchar *Data, int Length)
 		PatPmtParser();
 		if (pid == PatPmtParser()->Vpid())
 		{
-			m_videoDecoder->SetCodec(cAmlVideoDecoder::MapStreamTypes(
-					PatPmtParser()->Vtype()));
+			m_decoder->SetVideoPid(pid, PatPmtParser()->Vtype());
 			m_videoPid = pid;
 		}
 	}
-	return cDevice::PlayTsVideo(Data, Length);
+	return m_decoder->WriteTs(Data, Length);
 }
 
 int cAmlDevice::PlayTsAudio(const uchar *Data, int Length)
@@ -334,10 +260,11 @@ int cAmlDevice::PlayTsAudio(const uchar *Data, int Length)
 					streamType = PatPmtParser()->Dtype(i);
 					break;
 				}
-		m_audioDecoder->SetCodec(cAmlAudioDecoder::MapStreamTypes(streamType));
+
+		m_decoder->SetAudioPid(pid, streamType);
 		m_audioPid = pid;
 	}
-	return cDevice::PlayTsAudio(Data, Length);
+	return m_decoder->WriteTs(Data, Length);
 }
 
 bool cAmlDevice::Poll(cPoller &Poller, int TimeoutMs)

@@ -1,6 +1,9 @@
 VDR Plugin 'amlhddevice' Revision History
 -----------------------------------------
 
+- fixed:
+  - A/V sync
+
 2015-08-23: Version 0.0.1
 -------------------------
 initial prototype

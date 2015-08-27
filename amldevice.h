@@ -11,8 +11,7 @@
 
 #include "tools.h"
 
-class cAmlAudioDecoder;
-class cAmlVideoDecoder;
+class cAmlDecoder;
 
 class cAmlDevice : cDevice
 {
@@ -31,9 +30,6 @@ public:
 
 	virtual bool SetPlayMode(ePlayMode PlayMode);
 
-	virtual int PlayVideo(const uchar *Data, int Length);
-	virtual int PlayAudio(const uchar *Data, int Length, uchar Id);
-
 	virtual bool Poll(cPoller &Poller, int TimeoutMs = 0);
 	virtual bool Flush(int TimeoutMs = 0);
 
@@ -50,8 +46,7 @@ private:
 
 	void (*m_onPrimaryDevice)(void);
 
-	cAmlAudioDecoder *m_audioDecoder;
-	cAmlVideoDecoder *m_videoDecoder;
+	cAmlDecoder *m_decoder;
 
 	int m_audioPid;
 	int m_videoPid;
