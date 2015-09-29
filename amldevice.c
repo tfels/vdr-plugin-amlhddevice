@@ -31,16 +31,7 @@ public:
 
 	virtual ~cAmlDecoder()
 	{
-		if (m_initialized)
-			codec_close(&m_param);
-	}
-
-	virtual void Stop(void)
-	{
-		if (m_initialized)
-			codec_close(&m_param);
-
-		m_initialized = false;
+		Stop();
 	}
 
 	virtual void Reset(void)
@@ -52,9 +43,6 @@ public:
 
 	virtual int WriteTs(const uchar *data, int length)
 	{
-		if (!m_initialized)
-			return 0;
-
 		int ret = length;
 
 		while (length)
@@ -75,15 +63,9 @@ public:
 		return ret;
 	}
 
-	virtual bool Initialized(void)
-	{
-		return m_initialized;
-	}
-
 	void SetAudioPid(int pid, int streamType)
 	{
-		if (!m_param.has_audio)
-			Stop();
+		Stop();
 
 		m_param.has_audio = 1;
 		m_param.audio_pid = pid;
@@ -100,16 +82,12 @@ public:
 		m_param.audio_info.channels = 0;
 		m_param.audio_info.sample_rate = 0;
 
-		if (!ApplyConfig())
-			ELOG("failed to set audio codec!");
-		else
-			DLOG("set audio codec");
+		Start();
 	}
 
 	void SetVideoPid(int pid, int streamType)
 	{
-		if (!m_param.has_video)
-			Stop();
+		Stop();
 
 		m_param.has_video = 1;
 		m_param.video_pid = pid;
@@ -121,19 +99,38 @@ public:
 		m_param.am_sysinfo.format = m_param.video_type == VFORMAT_H264 ?
 				VIDEO_DEC_FORMAT_H264 : VIDEO_DEC_FORMAT_UNKNOW;
 
-		if (!ApplyConfig())
-			ELOG("failed to set video codec!");
-		else
-			DLOG("set video codec");
+		Start();
 	}
 
 protected:
 
-	bool ApplyConfig(void)
+	virtual void Stop(void)
 	{
-		int ret = m_initialized ? codec_reset(&m_param) : codec_init(&m_param);
-		m_initialized = ret == CODEC_ERROR_NONE;
-		return m_initialized;
+		if (!m_initialized || (!m_param.has_audio && !m_param.has_video))
+			return;
+
+		if (codec_close(&m_param) != CODEC_ERROR_NONE)
+			ELOG("failed to close codec!");
+		else
+			m_initialized = false;
+	}
+
+	virtual void Start(void)
+	{
+		if (m_initialized || (!m_param.has_audio && !m_param.has_video))
+			return;
+
+		cSysFs::Write("/sys/class/tsdemux/stb_source", 2);
+		cSysFs::Write("/sys/class/tsync/pts_pcrscr", "0x0");
+
+		if (codec_init(&m_param) != CODEC_ERROR_NONE)
+			ELOG("failed to init codec!");
+		else
+		{
+			m_initialized = true;
+			cSysFs::Write("/sys/class/tsync/enable",
+					m_param.has_audio && m_param.has_video ? 1 : 0);
+		}
 	}
 
 	codec_para_t m_param;
@@ -184,7 +181,6 @@ void cAmlDevice::MakePrimaryDevice(bool On)
 		m_onPrimaryDevice();
 	cDevice::MakePrimaryDevice(On);
 
-	cSysFs::Write("/sys/class/tsync/enable", 1);
 	codec_audio_basic_init();
 }
 
@@ -208,7 +204,6 @@ bool cAmlDevice::SetPlayMode(ePlayMode PlayMode)
 	{
 	case pmNone:
 		m_decoder->Reset();
-//		cSysFs::Write("/sys/class/tsync/pts_pcrscr", "0x0");
 		m_audioPid = 0;
 		m_videoPid = 0;
 		break;
