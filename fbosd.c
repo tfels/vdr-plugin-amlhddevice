@@ -153,6 +153,14 @@ private:
 			return false;
 		}
 
+		if (m_vinfo.bits_per_pixel != 32)
+		{
+			ELOG("wrong frame buffer pixel format, only ARGB supported!");
+			close(m_fd);
+			m_fd = 0;
+			return false;
+		}
+
 		m_size = m_vinfo.xres * m_vinfo.yres * m_vinfo.bits_per_pixel / 8;
 		m_fb = (char *)mmap(0, m_size, PROT_READ | PROT_WRITE, MAP_SHARED,
 				m_fd, 0);
