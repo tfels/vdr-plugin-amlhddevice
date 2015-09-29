@@ -21,7 +21,7 @@ private:
 
 	static void OnPrimaryDevice(void)
 	{
-		new cFbOsdProvider("/dev/fb1");
+		new cFbOsdProvider("/dev/fb0");
 	}
 
 public:
@@ -60,9 +60,9 @@ bool cPluginAmlHdDevice::Initialize(void)
 		if (m_device->Init())
 			return false;
 
-		cSysFs::Write("/sys/class/graphics/fb0/blank", 1);
-		cSysFs::Write("/sys/class/graphics/fb1/mode", "U:1280x720p-0\n");
-		cSysFs::Write("/sys/class/graphics/fb1/blank", 0);
+		cSysFs::Write("/sys/class/graphics/fb0/mode", "U:1280x720p-0\n");
+		cSysFs::Write("/sys/class/graphics/fb0/blank", 0);
+		cSysFs::Write("/sys/class/graphics/fb1/blank", 1);
 	}
 	return true;
 }
@@ -74,8 +74,8 @@ bool cPluginAmlHdDevice::Start(void)
 
 void cPluginAmlHdDevice::Stop(void)
 {
-	cSysFs::Write("/sys/class/graphics/fb1/blank", 1);
-	cSysFs::Write("/sys/class/graphics/fb0/blank", 0);
+	cSysFs::Write("/sys/class/graphics/fb0/blank", 1);
+	cSysFs::Write("/sys/class/graphics/fb1/blank", 0);
 }
 
 VDRPLUGINCREATOR(cPluginAmlHdDevice); // Don't touch this! okay.
