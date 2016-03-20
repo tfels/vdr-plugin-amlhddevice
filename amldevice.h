@@ -8,10 +8,48 @@
 #define AML_DEVICE_H
 
 #include <vdr/device.h>
-
 #include "tools.h"
 
-class cAmlDecoder;
+extern "C" {
+#include <codec.h>
+}
+
+class cScheduler
+{
+
+public:
+
+	cScheduler();
+	virtual ~cScheduler() { }
+
+	void SetSpeed(int speed, bool forward);
+	void Reset();
+
+	bool Check(int64_t pts);
+	int64_t GetPts(void);
+
+	enum eSpeed {
+		ePause,
+		eSlowest,
+		eSlower,
+		eSlow,
+		eNormal,
+		eFast,
+		eFaster,
+		eFastest,
+		eNumSpeeds
+	};
+
+private:
+
+	int64_t m_pts;
+	cTimeMs m_timestamp;
+
+	eSpeed m_speed;
+	bool m_forward;
+
+	static const int s_speeds[eNumSpeeds];
+};
 
 class cAmlDevice : cDevice
 {
@@ -35,21 +73,36 @@ public:
 
 	virtual void GetOsdSize(int &Width, int &Height, double &PixelAspect);
 
+	virtual int64_t GetSTC(void);
+
 protected:
 
 	virtual void MakePrimaryDevice(bool On);
 
-	virtual int PlayTsVideo(const uchar *Data, int Length);
-	virtual int PlayTsAudio(const uchar *Data, int Length);
+	virtual int PlayVideo(const uchar *Data, int Length);
+	virtual int PlayAudio(const uchar *Data, int Length, uchar Id);
+
+	void StillPicture(const uchar *Data, int Length);
+
+	virtual void Clear(void);
+	virtual void Play(void);
+	virtual void Freeze(void);
+
+	virtual void TrickSpeed(int Speed, bool Forward);
+
+	virtual void SetVolumeDevice(int Volume);
 
 private:
 
 	void (*m_onPrimaryDevice)(void);
 
-	cAmlDecoder *m_decoder;
+	codec_para_t m_videoCodec;
+	codec_para_t m_audioCodec;
 
-	int m_audioPid;
-	int m_videoPid;
+	uchar m_audioId;
+	bool m_trickMode;
+
+	cScheduler m_scheduler;
 };
 
 #endif
