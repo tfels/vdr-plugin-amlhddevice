@@ -148,6 +148,8 @@ void cAmlDevice::GetOsdSize(int &Width, int &Height, double &PixelAspect)
 {
 	Width = 1280;
 	Height = 720;
+	Width = 1920;
+	Height = 1080;
 	PixelAspect = (double)Width / Height;
 }
 

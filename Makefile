@@ -12,7 +12,6 @@ PLUGIN = amlhddevice
 ### The version number of this plugin (taken from the main source file):
 
 VERSION = $(shell grep 'static const char \*VERSION *=' $(PLUGIN).c | awk '{ print $$6 }' | sed -e 's/[";]//g')
-
 ### The directory environment:
 
 # Use package data if installed...otherwise assume we're under the VDR source directory:
@@ -46,9 +45,10 @@ PACKAGE = vdr-$(ARCHIVE)
 SOFILE = libvdr-$(PLUGIN).so
 
 ### Includes and Defines (add further entries here):
-
 LDLIBS   += $(shell pkg-config --libs libamcodec)
 INCLUDES += $(shell pkg-config --cflags libamcodec)
+LDLIBS   += -L /usr/lib/aml_libs -lamcodec -lamadec -lamavutils -lasound
+INCLUDES += -I /usr/include/amcodec
 
 DEFINES += -DPLUGIN_NAME_I18N='"$(PLUGIN)"'
 
